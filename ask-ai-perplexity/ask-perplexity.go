@@ -9,12 +9,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
-	"github.com/joho/godotenv"
 )
 
 type Message struct {
@@ -44,12 +45,24 @@ type Response struct {
 var messages []Message
 var chatHistory *widget.Entry
 
-func init() {
-	err := godotenv.Load()
+func loadAPIKey() string {
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Println("Error loading .env file")
+		fmt.Println("홈 디렉토리를 찾을 수 없습니다:", err)
+		return ""
 	}
 
+	configPath := filepath.Join(homeDir, "ask-perplexity-key.conf")
+	content, err := ioutil.ReadFile(configPath)
+	if err != nil {
+		fmt.Println("설정 파일을 읽을 수 없습니다:", err)
+		return ""
+	}
+
+	return strings.TrimSpace(string(content))
+}
+
+func init() {
 	messages = append(messages, Message{
 		Role:    "system",
 		Content: "모든 응답은 반드시 한국어로 해주세요. 질문이 영어로 들어와도 한국어로 답변해주세요. 답변할 때는 가능한 한 자세하고 구체적으로 설명해주세요. 예시나 부연설명을 포함하여 충분히 긴 답변을 제공해주세요.",
@@ -65,7 +78,7 @@ func sendMessage(apiKey string, userInput string) string {
 	})
 
 	requestBody := RequestBody{
-		Model:       "llama-3.1-sonar-small-128k-online",
+		Model:       "llama-3.1-sonar-large-128k-online",
 		Messages:    messages,
 		MaxTokens:   2000,
 		Temperature: 0.8,
@@ -131,9 +144,9 @@ func handleMessage(input *widget.Entry, chatHistory *widget.Entry, apiKey string
 }
 
 func main() {
-	apiKey := os.Getenv("PERPLEXITY_API_KEY")
+	apiKey := loadAPIKey()
 	if apiKey == "" {
-		fmt.Println("API key not found in environment variables")
+		fmt.Println("API 키를 설정 파일에서 찾을 수 없습니다")
 		return
 	}
 
@@ -149,15 +162,6 @@ func main() {
 	input.MultiLine = true
 	input.Wrapping = fyne.TextWrapWord
 	input.SetPlaceHolder("메시지를 입력하세요 :)")
-
-	// Ctrl+Enter 단축키 처리를 위한 이벤트 핸들러 추가 // 잘안됨..
-	//if deskCanvas, ok := window.Canvas().(desktop.Canvas); ok {
-	//	deskCanvas.SetOnKeyDown(func(ev *fyne.KeyEvent) {
-	//		if ev.Name == fyne.KeyReturn && ev.Modifiers == desktop.ControlModifier {
-	//			handleMessage(input, chatHistory, apiKey)
-	//		}
-	//	})
-	//}
 
 	sendButton := widget.NewButton("전송", func() {
 		handleMessage(input, chatHistory, apiKey)
